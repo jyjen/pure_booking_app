@@ -9,9 +9,6 @@ __pycache__/
 *.csv
 *.hdf5
 
-#
-/reference_files/
-
 # C extensions
 *.so
 
