@@ -67,14 +67,14 @@ class ScheduleScraper:
     def load_url(url: str,
                  chromedriver_fp: str = "reference_files/chromedriver.exe"):
 
-        """Loads a url and waits until schedule table elements appear.
+        """Creates an instance of the Chrome WebDriver and loads `url`.
 
         Arguments:
             url {str} -- URL to load
 
         Returns:
-            browser {webdriver.chrome.webdriver.WebDriver} -- Browser
-                object
+            browser {webdriver.chrome.webdriver.WebDriver} -- Chrome
+                WebDriver instance
         """
 
         browser = webdriver.Chrome(executable_path=chromedriver_fp)
@@ -91,7 +91,7 @@ class ScheduleScraper:
         to have the attribute `style` == 'display: none;'
 
         Arguments:
-            browser {webdriver.chrome.webdriver.WebDriver} -- Browser object
+            browser {webdriver.chrome.webdriver.WebDriver} -- WebDriver instance
             timeout {int} -- Seconds for selenium WebDriver to wait before
                 throwing a TimeoutException (default: {20})
 
@@ -113,10 +113,6 @@ class ScheduleScraper:
     def parse_page(soup: BeautifulSoup,
                    class_type: str):
 
-        # TODO: parsing doesn't work for multi entries
-        # i.e. if there's more than one class durig a certain time slot
-        # see: AST Fitness
-
         """Parses BeautifulSoup object to extract class schedule.
 
         Arguments;
@@ -127,11 +123,12 @@ class ScheduleScraper:
                 extracted schedule
         """
 
-        tag_has_class = soup.find_all('td', {"data-has-class": "1"})
+        tag_has_class = [tag for tag in soup.find_all('td')
+                        if tag.has_attr('data-has-class')]
         df_list = []
 
         for tag in tag_has_class:
-            temp_df = pd.DataFrame()
+            num_classes = int(tag.get('data-has-class', 1))
             date = tag['data-date']
             time = tag['data-time']
             get_text = lambda tag: [t.text for t in tag]
@@ -139,8 +136,8 @@ class ScheduleScraper:
             teachers = get_text(tag.find_all('span', {'class':'class-teacher'}))
             durations = get_text(tag.find_all('span', {'class':'duration'}))
 
-            temp_df = pd.DataFrame({'date': date,
-                                    'time': time,
+            temp_df = pd.DataFrame({'date': [date]*num_classes,
+                                    'time': [time]*num_classes,
                                     'class': class_names,
                                     'teacher': teachers,
                                     'duration': durations})
@@ -157,10 +154,11 @@ class ScheduleScraper:
         """Navigates to next week's schedule.
 
         Arguments:
-            browser {webdriver.chrome.webdriver.WebDriver} -- Browser object
-                to navigate in
+            browser {webdriver.chrome.webdriver.WebDriver} -- WebDriver
+                instance to navigate in
         Returns:
-            browser {webdriver.chrome.webdriver.WebDriver} -- Updated browser object
+            browser {webdriver.chrome.webdriver.WebDriver} -- Updated WebDriver
+                instance
         """
         # TODO: THIS METHOD
         # click button
