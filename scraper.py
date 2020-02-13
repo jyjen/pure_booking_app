@@ -1,11 +1,43 @@
 from bs4 import BeautifulSoup
 from datetime import datetime, timedelta
 from selenium import webdriver
+from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
 import requests
 import pandas as pd
+
+class text_present_in_element_attribute(object):
+
+    """Custom expected condition class. Waits for a specific attribute value.
+
+    Arguments:
+        locator {tuple} -- Locator to use to find an element
+        attribute {str} -- Attribute to check value of
+        value {str} -- Value to match
+
+    Returns:
+        {bool} -- Whether the condition was satisfied
+    """
+
+    def __init__(self,
+                 locator,
+                 attribute,
+                 value):
+
+        self.locator = locator
+        self.attribute = attribute
+        self.value = value
+
+    def __call__(self,
+                 driver):
+        try:
+            element_attribute = EC._find_element(driver,
+                self.locator).get_attribute(self.attribute)
+            return element_attribute == self.value
+        except StaleElementReferenceException:
+            return False
 
 class ScheduleScraper:
 
@@ -32,7 +64,8 @@ class ScheduleScraper:
             self.url_dict = url_dict
 
     @staticmethod
-    def load_url(url: str):
+    def load_url(url: str,
+                 chromedriver_fp: str = "reference_files/chromedriver.exe"):
 
         """Loads a url and waits until schedule table elements appear.
 
@@ -44,28 +77,33 @@ class ScheduleScraper:
                 object
         """
 
-        browser = webdriver.Chrome(executable_path="reference_files/chromedriver.exe")
+        browser = webdriver.Chrome(executable_path=chromedriver_fp)
         browser.get(url)
 
         return browser
 
     @staticmethod
-    def get_soup(browser):
+    def get_soup(browser,
+                 timeout: int = 20):
 
         """Gets page source and returns a BeautifulSoup object.
+        Specifically waits for the loading icon (sk-fading-circle)
+        to have the attribute `style` == 'display: none;'
 
         Arguments:
             browser {webdriver.chrome.webdriver.WebDriver} -- Browser object
+            timeout {int} -- Seconds for selenium WebDriver to wait before
+                throwing a TimeoutException (default: {20})
 
         Returns:
-            soup {BeautifulSoup} -- Soup; parsed page source
+            soup {BeautifulSoup} -- Soup; parsed html page source
         """
 
-        # TODO: add the wait condition > else page content is empty
-        # wait condition HAS to go here
-        # wait = WebDriverWait(driver, 10)
-        # element = wait.until(EC.)
-
+        wait = WebDriverWait(browser, timeout)
+        wait.until(text_present_in_element_attribute(
+            (By.CLASS_NAME, 'sk-fading-circle'),
+            'style',
+            'display: none;'))
         html = browser.page_source
         soup = BeautifulSoup(html, 'lxml')
 
@@ -132,7 +170,8 @@ class ScheduleScraper:
 
         return browser
 
-    def scrape_all(self):
+    def scrape_all(self,
+                   browser):
 
         # TODO: test this
 
@@ -145,6 +184,8 @@ class ScheduleScraper:
             browser = self.get_next_week(browser)
             soup = self.get_soup(browser)
             soup_bowl += [(k, soup)]
+
+        browser.close()
 
         parsed_soup = []
         for class_type, soup in soup_bowl:
