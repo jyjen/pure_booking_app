@@ -3,8 +3,7 @@ from custom_ec import text_present_in_element_attribute
 from datetime import datetime, timedelta
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support.ui import Select, WebDriverWait
 
 import requests
 import pandas as pd
@@ -56,13 +55,14 @@ class ScheduleScraper:
     def get_soup(browser,
                  timeout: int = 20):
 
-        """Gets page source and returns a BeautifulSoup object.
-        Specifically waits for the loading icon (sk-fading-circle)
-        to have the attribute `style` == 'display: none;'
+        """Gets page source and returns a BeautifulSoup object
+        once the loading icon disappears. Specifically waits for
+        the loading icon (sk-fading-circle) to have the attribute
+        `style` == 'display: none;'
 
         Arguments:
             browser {webdriver.chrome.webdriver.WebDriver} -- WebDriver instance
-            timeout {int} -- Seconds for selenium WebDriver to wait before
+            timeout {int} -- Seconds for Selenium WebDriver to wait before
                 throwing a TimeoutException (default: {20})
 
         Returns:
@@ -80,12 +80,31 @@ class ScheduleScraper:
         return soup
 
     @staticmethod
+    def get_next_week(browser):
+
+        """Navigates to next week's schedule.
+
+        Arguments:
+            browser {webdriver.chrome.webdriver.WebDriver} -- WebDriver
+                instance to navigate in
+
+        Returns:
+            browser {webdriver.chrome.webdriver.WebDriver} -- Updated
+                WebDriver instance
+        """
+
+        dropdown = Select(browser.find_element(By.ID, "weekDate"))
+        dropdown.select_by_index(1)
+
+        return browser
+
+    @staticmethod
     def parse_page(soup: BeautifulSoup,
                    class_type: str):
 
         """Parses BeautifulSoup object to extract class schedule.
 
-        Arguments;
+        Arguments:
             soup {BeautifulSoup} -- Parsed page source
 
         Returns:
@@ -114,52 +133,42 @@ class ScheduleScraper:
             df_list += [temp_df]
 
         df = pd.concat(df_list)
+
         df['class_type'] = class_type
 
         return df
 
-    def get_next_week(self,
-                      browser):
-
-        """Navigates to next week's schedule.
-
-        Arguments:
-            browser {webdriver.chrome.webdriver.WebDriver} -- WebDriver
-                instance to navigate in
-        Returns:
-            browser {webdriver.chrome.webdriver.WebDriver} -- Updated WebDriver
-                instance
-        """
-        # TODO: THIS METHOD
-        # click button
-        # go to next week
-        # return browser object
-        browser = None
-
-        return browser
-
     def scrape_all(self,
-                   browser):
+                   chromedriver_fp: str = "reference_files/chromedriver.exe"):
 
         # TODO: test this
 
         soup_bowl = []
-        for k,v in self.url_dict:
-            browser = self.load_url(v)
+        for key, value in self.url_dict.items():
+            browser = self.load_url(url=value,
+                                    chromedriver_fp=chromedriver_fp)
             soup = self.get_soup(browser)
-            soup_bowl += [(k, soup)]
+            soup_bowl += [(key, soup)]
 
             browser = self.get_next_week(browser)
             soup = self.get_soup(browser)
-            soup_bowl += [(k, soup)]
+            soup_bowl += [(key, soup)]
 
-        browser.close()
+            browser.close()
 
         parsed_soup = []
         for class_type, soup in soup_bowl:
+            # this is throwing an error on soup_bowl[2]
+            # error is being thrown during the for loop
+            # for tag in tag_has_class
+            # check whether or not the col_nums are consistent
+            # check whether or not it's bc the page isn't completely loaded?
+
             df = self.parse_page(soup=soup,
                                  class_type=class_type)
             parsed_soup += [df]
+
+        return parsed_soup
 
         full_df = pd.concat(parsed_soup)
 
@@ -167,6 +176,8 @@ class ScheduleScraper:
 
     @staticmethod
     def convert_dt(df: pd.core.frame.DataFrame):
+
+    # TODO: DONE-ish
 
         current_year = datetime.now().year
         combined_dt = df.apply(lambda row: ('{} {} {}').format(
@@ -192,6 +203,8 @@ class ScheduleScraper:
     @staticmethod
     def save(df:pd.core.frame.DataFrame,
              save_fp: str):
+
+        # TODO: DONE
 
         """Saves specified DataFrame to save_fp.
 
